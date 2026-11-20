@@ -22,6 +22,7 @@ command -v curl >/dev/null || die 'curl is required'
 command -v visudo >/dev/null || die 'visudo is required'
 [[ -x /opt/dsette/.venv/bin/python ]] || die 'existing isolated Python runtime not found'
 [[ -x /opt/dsette/.bootstrap/bin/uv ]] || die 'existing uv runtime not found'
+cd /opt/dsette
 [[ -f /var/lib/dsette/tls/server.crt ]] || die 'server CA certificate not found'
 [[ ! -e /opt/dsette-source ]] || die '/opt/dsette-source already exists; refusing to overwrite'
 [[ ! -e /var/lib/dsette/current ]] || die 'current release link already exists; updater appears initialized'
@@ -63,10 +64,11 @@ sudo -u dsette env DSETTE_DATA_DIR="$RELEASE/.test-data" "$RELEASE/.venv/bin/pyt
 rm -rf --one-file-system "$RELEASE/.test-data"
 
 # Stable supervisor environment is outside the release symlink it changes.
-install -d -o root -g root -m 0755 /opt/dsette-updater
-"$UV" venv --python "$PY" /opt/dsette-updater/.venv
-UV_CACHE_DIR=/var/lib/dsette/.update-cache "$UV" pip install --python /opt/dsette-updater/.venv/bin/python --require-hashes -r "$RELEASE/requirements.lock"
-UV_CACHE_DIR=/var/lib/dsette/.update-cache "$UV" pip install --python /opt/dsette-updater/.venv/bin/python --no-deps "$RELEASE"
+install -d -o dsette -g dsette -m 0755 /opt/dsette-updater
+sudo -u dsette env UV_CACHE_DIR=/var/lib/dsette/.update-cache "$UV" venv --python "$PY" /opt/dsette-updater/.venv
+sudo -u dsette env UV_CACHE_DIR=/var/lib/dsette/.update-cache "$UV" pip install --python /opt/dsette-updater/.venv/bin/python --require-hashes -r "$RELEASE/requirements.lock"
+sudo -u dsette env UV_CACHE_DIR=/var/lib/dsette/.update-cache "$UV" pip install --python /opt/dsette-updater/.venv/bin/python --no-deps "$RELEASE"
+chown -R root:root /opt/dsette-updater
 chmod -R a+rX /opt/dsette-updater
 
 cat >/etc/dsette/update.env <<EOF

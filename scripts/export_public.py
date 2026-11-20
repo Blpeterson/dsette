@@ -37,6 +37,7 @@ class ExportError(RuntimeError): pass
 
 
 def allowed(relative: PurePosixPath) -> bool:
+    if relative.as_posix()==".github/workflows/tests.yml": return True
     value = relative.as_posix()
     if len(relative.parts)==1 and relative.name in ROOT_FILES|OPTIONAL_ROOT_FILES: return True
     if relative.name in PRIVATE_NAMES or any(part.startswith(".") for part in relative.parts): return False

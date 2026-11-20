@@ -113,7 +113,12 @@ def receive_file(api,tid,destination,progress=None):
     if partial.is_symlink(): raise ValueError("Partial download must not be a symlink")
     fd=os.open(partial,flags,0o600)
     with os.fdopen(fd,"r+b") as output:
-        if not stat.S_ISREG(os.fstat(output.fileno()).st_mode): raise ValueError("Partial download is not a regular file")
+        info=os.fstat(output.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink!=1:
+            raise ValueError("Partial download must be a private regular file without hard links")
+        if hasattr(os,"getuid") and info.st_uid!=os.getuid():
+            raise ValueError("Partial download belongs to another user")
+        if os.name!="nt": os.fchmod(output.fileno(),0o600)
         offset=output.seek(0,os.SEEK_END)
         if offset>size: output.truncate(0); offset=0
         _progress(progress,offset,size)

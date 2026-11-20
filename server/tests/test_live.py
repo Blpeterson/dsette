@@ -48,7 +48,9 @@ def test_queue_is_byte_bounded_and_backpressured():
         r.receiver_ready.set()
         live.relays["test"] = r
         task = asyncio.create_task(live.send("test", Request(data), {"id": "sender"}))
-        await asyncio.sleep(.03)
+        for _ in range(500):
+            if r.queue.full(): break
+            await asyncio.sleep(.01)
         assert not task.done()
         assert r.queue.qsize() == live.QUEUE_BLOCKS
         assert all(len(block) <= live.BLOCK_SIZE for block in r.queue._queue)

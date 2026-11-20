@@ -80,7 +80,8 @@ def main():
         if not (cert and key) and not (a.allow_http_loopback and config.listen_host in {"127.0.0.1","::1"}):
             raise SystemExit("Set DSETTE_TLS_CERT and DSETTE_TLS_KEY. TLS is required.")
         uvicorn.run("dsette_server.app:app",host=config.listen_host,port=config.listen_port,
-                    ssl_certfile=cert,ssl_keyfile=key,access_log=False,workers=1)
+                    ssl_certfile=cert,ssl_keyfile=key,access_log=False,workers=1,
+                    proxy_headers=True,forwarded_allow_ips="127.0.0.1,::1")
     elif a.cmd=="invite":
         print("One-time invite (expires in 10 minutes):",create_invite())
         cert=Path(config.tls_cert) if config.tls_cert else config.data_dir/"tls"/"server.crt"
