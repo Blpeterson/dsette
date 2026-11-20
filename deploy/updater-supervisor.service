@@ -13,5 +13,5 @@ ExecStart=/opt/dsette-updater/.venv/bin/python -m dsette_server.updater run-queu
 PrivateTmp=true
 ProtectHome=true
 ProtectSystem=strict
-ReadWritePaths=/var/lib/dsette /opt/dsette-source
+ReadWritePaths=/var/lib/dsette /opt/dsette-source /run/dsette-control
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6

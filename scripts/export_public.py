@@ -17,7 +17,10 @@ DEPLOY_FILES = {
     "Caddyfile.example", "dsette.service", "firewall.md", "updater-check.sh",
     "updater-supervisor.service", "updater-systemd.md", "updater-trigger.path",
     "install-oracle.sh", "server-setup.sh", "configure-nginx.py",
-    "enable-updates.sh", "release-signers",
+    "enable-updates.sh", "release-signers", "dsette-control.conf",
+    "dsette-control-restart.path", "dsette-control-restart.service",
+    "dsette-control-stop.path", "dsette-control-stop.service",
+    "dsette-control-start.path", "dsette-control-start.service",
     "release-signers",
 }
 PRIVATE_NAMES = {

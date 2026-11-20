@@ -1,0 +1,10 @@
+[Unit]
+Description=Watch Datasette restart request
+After=systemd-tmpfiles-setup.service
+
+[Path]
+PathExists=/run/dsette-control/restart
+Unit=dsette-control-restart.service
+
+[Install]
+WantedBy=multi-user.target

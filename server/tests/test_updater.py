@@ -1,10 +1,10 @@
-import json, os, shutil, subprocess
+import json, os, shutil, subprocess, threading, time
 from pathlib import Path
 import pytest
 from dsette_server.updater import FileLock, UpdateConfig, UpdateError, Updater, _write_job, create_job, launch_update, read_job, redact, update_available
 
 def cfg(tmp_path, **changes):
-    values=dict(repo=tmp_path/"repo",data_dir=tmp_path/"data",remote="origin",branch="main",trusted_signers=("ABC123",),signature_format="gpg",wait_seconds=0,health_url="http://127.0.0.1:1",ca_file=None,restart_command=("true",))
+    values=dict(repo=tmp_path/"repo",data_dir=tmp_path/"data",remote="origin",branch="main",trusted_signers=("ABC123",),signature_format="gpg",wait_seconds=0,health_url="http://127.0.0.1:1",ca_file=None,control_dir=None,restart_command=("true",))
     values.update(changes); return UpdateConfig(**values)
 
 def test_config_fails_closed_without_signers(tmp_path):
@@ -153,4 +153,33 @@ def test_execute_current_target_completes_without_staging(tmp_path,monkeypatch):
     monkeypatch.setattr(updater,"_stage",lambda commit:(_ for _ in ()).throw(AssertionError("must not stage")))
     result=updater.execute(job)
     assert result["state"]=="complete" and "no update" in result["log"][-1]
+
+def test_service_control_broker_waits_for_ack(tmp_path):
+    control=tmp_path/"control"; control.mkdir(); c=cfg(tmp_path,control_dir=control,control_timeout=2)
+    seen=[]
+    def broker():
+        marker=control/"restart"; deadline=time.monotonic()+1
+        while not marker.exists() and time.monotonic()<deadline: time.sleep(.01)
+        seen.append(marker.exists()); marker.unlink()
+    thread=threading.Thread(target=broker); thread.start(); Updater(c)._restart(); thread.join()
+    assert seen==[True] and not (control/"restart").exists()
+
+def test_service_control_broker_timeout(tmp_path):
+    control=tmp_path/"control"; control.mkdir(); c=cfg(tmp_path,control_dir=control,control_timeout=.05)
+    with pytest.raises(UpdateError,match="timed out"): Updater(c)._restart()
+
+@pytest.mark.skipif(os.name=="nt",reason="POSIX symlink rollback")
+def test_rollback_exception_still_terminal(tmp_path,monkeypatch):
+    c=cfg(tmp_path); c.data_dir.mkdir(); previous=tmp_path/"previous"; release=c.releases/("b"*40)
+    previous.mkdir(); release.mkdir(parents=True); c.current.symlink_to(previous,target_is_directory=True)
+    job=create_job(cfg=c); updater=Updater(c)
+    monkeypatch.setattr(updater,"_wait_for_uploads",lambda force:None)
+    monkeypatch.setattr(updater,"_resolve_target",lambda:("a"*40,"b"*40))
+    monkeypatch.setattr(updater,"_verify_signature",lambda commit:None)
+    monkeypatch.setattr(updater,"_stage",lambda commit:release)
+    monkeypatch.setattr(updater,"_backup_db",lambda job:tmp_path/"backup")
+    monkeypatch.setattr(updater,"_restart",lambda:None); monkeypatch.setattr(updater,"_healthy",lambda commit:False)
+    monkeypatch.setattr(updater,"_restore",lambda backup:(_ for _ in ()).throw(UpdateError("restore exploded")))
+    result=updater.execute(job)
+    assert result["state"]=="failed" and "health" in result["error"] and "restore exploded" in result["rollback_error"]
 

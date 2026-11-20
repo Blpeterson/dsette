@@ -27,9 +27,11 @@ table. Running an untagged development checkout is at the operator's risk.
 - The update feature is disabled until a remote, branch, and trusted signing
   fingerprints are explicitly configured.
 - A trusted signer can execute dependency hooks, tests, and migrations as the
-  unprivileged `dsette` account. The updater receives only exact start, stop,
-  and restart sudo rules for its own service—never wildcard systemctl or shell
-  access. Keep signer authority narrow and protect those keys accordingly.
+  unprivileged `dsette` account with `NoNewPrivileges`. It has no sudoers
+  access. Three root-owned path/one-shot broker pairs translate fixed
+  start/stop/restart marker names into fixed `systemctl ACTION dsette`
+  commands; they accept no arbitrary unit or command. Keep signer authority
+  narrow and protect those keys accordingly.
 - Dependency locks and signatures reduce supply-chain risk but do not replace
   code review, host patching, backups, least privilege, or monitoring.
 

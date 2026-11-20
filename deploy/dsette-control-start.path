@@ -1,0 +1,10 @@
+[Unit]
+Description=Watch Datasette start request
+After=systemd-tmpfiles-setup.service
+
+[Path]
+PathExists=/run/dsette-control/start
+Unit=dsette-control-start.service
+
+[Install]
+WantedBy=multi-user.target

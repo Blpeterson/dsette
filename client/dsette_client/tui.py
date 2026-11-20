@@ -19,7 +19,7 @@ from textual.widgets import Button, Checkbox, DirectoryTree, Footer, Input, Labe
 from textual.widgets.option_list import Option
 from textual.worker import get_current_worker
 
-from .animation import SignalGarden
+from .animation import SignalGarden, wordmark_lines
 
 
 def human_size(size):
@@ -40,18 +40,6 @@ class BootScreen(ModalScreen[None]):
     BootScreen #boot-caption { height: 2; text-align: center; color: #a8b9ae; }
     BootScreen.compact #boot-card { padding: 0; }
     """
-    LARGE = (
-        r" ____    _  _____ _    ____  _____ _____ _____ _____ ",
-        r"|  _ \  / \|_   _/ \  / ___|| ____|_   _|_   _| ____|",
-        r"| | | |/ _ \ | |/ _ \ \___ \|  _|   | |   | | |  _|  ",
-        r"| |_| / ___ \| / ___ \ ___) | |___  | |   | | | |___ ",
-        r"|____/_/   \_\_/_/   \_\____/|_____| |_|   |_| |_____|",
-    )
-    SMALL = {
-        "D": (" _ ", "| \\", "|_/"), "A": (" _ ", "/_\\", "| |"),
-        "T": ("___", " | ", " | "), "S": (" __", "(_ ", "__)"),
-        "E": (" __", "|_ ", "|__"),
-    }
 
     def __init__(self, duration=1.5):
         super().__init__()
@@ -81,10 +69,7 @@ class BootScreen(ModalScreen[None]):
         self.paint_boot()
 
     def paint_boot(self):
-        if self.size.width >= 62:
-            wordmark = "\n".join(self.LARGE)
-        else:
-            wordmark = "\n".join(" ".join(self.SMALL[letter][row] for letter in "DATASETTE") for row in range(3))
+        wordmark = "\n".join(wordmark_lines(compact=self.size.width < 62))
         self.query_one("#boot-wordmark", Static).update(Text(wordmark, style="#ecc48d"))
         width = max(28, min(68, self.size.width - 4))
         grid = [[" "] * width for _ in range(7)]

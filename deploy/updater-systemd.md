@@ -41,16 +41,25 @@ checkout must be writable only by `dsette` and administrators. Login-time
 checks use credential-free `DSETTE_UPDATE_REMOTE_URL` with `git ls-remote` and
 do not fetch into the source checkout.
 
-The supervisor runs as `dsette`, not root. Install only these exact rules using
-`visudo`:
+The supervisor runs as `dsette` with `NoNewPrivileges=true`; it has no sudoers
+entry. Service control crosses a deliberately narrow root-owned broker. A
+tmpfiles rule creates `/run/dsette-control` as `root:dsette` mode `0770`, and
+the updater creates only one of three fixed marker names there: `start`,
+`stop`, or `restart`. Three root-owned `.path` units watch those names. Each
+activates a corresponding one-shot service whose command is a fixed argument
+vector such as `/bin/systemctl restart dsette`; after success, its fixed
+`ExecStartPost` removes only that marker. The broker accepts no unit name,
+remote input, shell fragment, or arbitrary command from the updater.
 
-```sudoers
-dsette ALL=(root) NOPASSWD: /bin/systemctl stop dsette
-dsette ALL=(root) NOPASSWD: /bin/systemctl start dsette
-dsette ALL=(root) NOPASSWD: /bin/systemctl restart dsette
+Install `dsette-control.conf` under `/etc/tmpfiles.d/`, install and enable the
+three `dsette-control-{start,stop,restart}.{path,service}` pairs, and set:
+
+```ini
+DSETTE_UPDATE_CONTROL_DIR=/run/dsette-control
 ```
 
-Never grant wildcard systemctl or shell access. Add `from
+The supplied `deploy/enable-updates.sh` performs this setup. Do not replace the
+broker with wildcard systemctl or shell access. Add `from
 dsette_server.updater_routes import router as updater_router`
 and `app.include_router(updater_router)` to the application, and reject new
 announcements/chunks with HTTP 503 whenever `maintenance_active()` is true
@@ -67,8 +76,14 @@ Enable the supervisor after configuration:
 ```bash
 sudo install -m 0644 deploy/updater-trigger.path /etc/systemd/system/dsette-updater.path
 sudo install -m 0644 deploy/updater-supervisor.service /etc/systemd/system/dsette-updater.service
+sudo install -m 0644 deploy/dsette-control.conf /etc/tmpfiles.d/dsette-control.conf
+sudo systemd-tmpfiles --create /etc/tmpfiles.d/dsette-control.conf
+for action in start stop restart; do
+  sudo install -m 0644 "deploy/dsette-control-$action.path" "/etc/systemd/system/dsette-control-$action.path"
+  sudo install -m 0644 "deploy/dsette-control-$action.service" "/etc/systemd/system/dsette-control-$action.service"
+done
 sudo systemctl daemon-reload
-sudo systemctl enable --now dsette-updater.path
+sudo systemctl enable --now dsette-updater.path dsette-control-start.path dsette-control-stop.path dsette-control-restart.path
 # Queue a manual job through dsetd or the authenticated admin API.
 ```
 

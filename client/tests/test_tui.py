@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from textual.widgets import Button, Input, ProgressBar, Static
 
-from dsette_client.animation import SignalGarden
+from dsette_client.animation import SignalGarden, WORDMARK_GLYPHS, COMPACT_WORDMARK_GLYPHS, wordmark_lines
 from dsette_client.tui import BootScreen, DatasetteApp
 
 
@@ -37,6 +37,25 @@ class FakeAPI:
         progress(42, 100)
         progress(100, 100)
         return destination
+
+
+@pytest.mark.parametrize("compact,width,height,glyphs", [(False, 5, 5, WORDMARK_GLYPHS), (True, 3, 3, COMPACT_WORDMARK_GLYPHS)])
+def test_boot_wordmark_uses_aligned_cells_and_identical_repeated_letters(compact, width, height, glyphs):
+    rows = wordmark_lines(compact)
+    assert len(rows) == height
+    assert {len(row) for row in rows} == {9 * width + 8}
+    for index, letter in enumerate("DATASETTE"):
+        start = index * (width + 1)
+        assert tuple(row[start:start + width] for row in rows) == glyphs[letter]
+        if index < 8:
+            assert all(row[start + width] == " " for row in rows)
+    # Regression: the second A's lower rows used to merge with neighboring
+    # letters and shift relative to the first A.
+    first_a = width + 1
+    second_a = 3 * (width + 1)
+    assert [row[first_a:first_a + width] for row in rows] == [row[second_a:second_a + width] for row in rows]
+    assert rows[-2][first_a] == rows[-2][second_a]
+    assert rows[-1][first_a] == rows[-1][second_a] == "|"
 
 
 @pytest.mark.parametrize("size", [(36, 18), (48, 20), (80, 24), (120, 40)])

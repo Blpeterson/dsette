@@ -1,0 +1,15 @@
+[Unit]
+Description=Perform fixed Datasette restart
+
+[Service]
+Type=oneshot
+User=root
+Group=dsette
+ExecStart=/bin/systemctl restart dsette
+ExecStartPost=/usr/bin/rm -f /run/dsette-control/restart
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/run/dsette-control
+RestrictAddressFamilies=AF_UNIX

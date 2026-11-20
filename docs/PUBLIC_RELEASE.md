@@ -56,10 +56,13 @@ perform them only with the owner's explicit authorization.
 The optional update supervisor verifies signed, fast-forward commits before it
 acts. Nevertheless, a trusted signer can place arbitrary code in dependency
 build hooks, tests, migrations, and the application. Those steps run as the
-unprivileged `dsette` account. Its only privileged operations are exact sudoers
-rules to start, stop, or restart its own service, so a signer receives durable
-`dsette` code execution and service disruption capability, not an intentional
-root shell. Use dedicated hardware-backed
+unprivileged `dsette` account with `NoNewPrivileges` enabled. It has no sudoers
+access. Starting, stopping, and restarting its service is delegated to three
+root-owned path/one-shot broker pairs that accept only fixed marker filenames
+and run fixed `systemctl ACTION dsette` commands—never a caller-provided unit,
+remote command, or shell fragment. A signer still receives durable `dsette`
+code execution and service-disruption capability, but not an intentional root
+shell. Use dedicated hardware-backed
 signing keys where practical, keep the signer list minimal, require review, and
 revoke a lost key immediately. Signature verification proves who authorized
 code; it does not make that code safe.

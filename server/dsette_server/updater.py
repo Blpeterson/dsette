@@ -52,6 +52,8 @@ class UpdateConfig:
     wait_seconds: int = field(default_factory=lambda: int(os.getenv("DSETTE_UPDATE_WAIT_SECONDS", "300")))
     health_url: str = field(default_factory=lambda: os.getenv("DSETTE_UPDATE_HEALTH_URL", "https://127.0.0.1:8223/api/v1/health"))
     ca_file: Path | None = field(default_factory=lambda: Path(os.environ["DSETTE_UPDATE_CA_FILE"]) if os.getenv("DSETTE_UPDATE_CA_FILE") else None)
+    control_dir: Path | None = field(default_factory=lambda: Path(os.environ["DSETTE_UPDATE_CONTROL_DIR"]) if os.getenv("DSETTE_UPDATE_CONTROL_DIR") else None)
+    control_timeout: float = field(default_factory=lambda: float(os.getenv("DSETTE_UPDATE_CONTROL_TIMEOUT", "60")))
     restart_command: tuple[str, ...] = field(default_factory=lambda: (("/bin/systemctl", "restart", "dsette") if os.getenv("DSETTE_UPDATE_ROOT_SUPERVISOR") == "1" else ("sudo", "/bin/systemctl", "restart", "dsette")))
     stop_command: tuple[str, ...] = field(default_factory=lambda: (("/bin/systemctl", "stop", "dsette") if os.getenv("DSETTE_UPDATE_ROOT_SUPERVISOR") == "1" else ("sudo", "/bin/systemctl", "stop", "dsette")))
     start_command: tuple[str, ...] = field(default_factory=lambda: (("/bin/systemctl", "start", "dsette") if os.getenv("DSETTE_UPDATE_ROOT_SUPERVISOR") == "1" else ("sudo", "/bin/systemctl", "start", "dsette")))
@@ -314,9 +316,22 @@ class Updater:
         temp.unlink(missing_ok=True); temp.symlink_to(release, target_is_directory=True); os.replace(temp, self.cfg.current)
         return previous
 
-    def _restart(self) -> None: self.cmd(self.cfg.restart_command, timeout=60)
-    def _stop(self) -> None: self.cmd(self.cfg.stop_command, timeout=60)
-    def _start(self) -> None: self.cmd(self.cfg.start_command, timeout=60)
+    def _service(self, action: str, legacy: tuple[str,...]) -> None:
+        if action not in {"start","stop","restart"}: raise UpdateError("invalid service-control action")
+        if self.cfg.control_dir is None:
+            self.cmd(legacy,timeout=60); return
+        directory=self.cfg.control_dir
+        if not directory.is_dir() or directory.is_symlink(): raise UpdateError("service-control broker directory is unavailable")
+        marker=directory/action
+        fd=os.open(marker,os.O_CREAT|os.O_WRONLY|getattr(os,"O_NOFOLLOW",0),0o600); os.close(fd)
+        deadline=time.monotonic()+self.cfg.control_timeout
+        while marker.exists():
+            if time.monotonic()>=deadline: raise UpdateError(f"service-control broker timed out during {action}")
+            time.sleep(.1)
+
+    def _restart(self) -> None: self._service("restart",self.cfg.restart_command)
+    def _stop(self) -> None: self._service("stop",self.cfg.stop_command)
+    def _start(self) -> None: self._service("start",self.cfg.start_command)
 
     def _healthy(self, commit: str) -> bool:
         context = None
@@ -373,12 +388,14 @@ class Updater:
                 self._prune(); self.job["state"] = "complete"; self.log("update completed")
         except Exception as exc:
             self.log(f"update failed: {exc}")
-            if previous and release and self.cfg.current.is_symlink() and self.cfg.current.resolve() == release.resolve():
-                self._switch(previous); self._restore(backup)
-                try:
+            try:
+                if previous and release and self.cfg.current.is_symlink() and self.cfg.current.resolve() == release.resolve():
+                    self._switch(previous); self._restore(backup)
                     if not backup: self._restart()
                     self.log("rollback completed")
-                except Exception as rollback: self.log(f"rollback restart failed: {rollback}")
+            except Exception as rollback:
+                self.job["rollback_error"]=redact(str(rollback))[:1000]
+                self.log(f"rollback failed: {rollback}")
             self.job["state"] = "failed"; self.job["error"] = redact(str(exc))[:1000]
         finally:
             if owns_maintenance:

@@ -4,6 +4,30 @@ from textual.reactive import reactive
 from textual.widgets import Static
 
 
+# Every letter occupies the same five-column cell. Keeping the glyphs separate
+# makes repeated letters identical and prevents row-by-row centering drift.
+WORDMARK_GLYPHS = {
+    "D": (" ___ ", "|   \\", "|   |", "|   |", "|___/"),
+    "A": ("  _  ", " / \\ ", "/ _ \\", "|   |", "|   |"),
+    "T": ("_____", "  |  ", "  |  ", "  |  ", "  |  "),
+    "S": (" ____", "/    ", "\\___ ", "    \\", "____/"),
+    "E": ("_____", "|    ", "|___ ", "|    ", "|____"),
+}
+COMPACT_WORDMARK_GLYPHS = {
+    "D": (" _ ", "| \\", "|_/"),
+    "A": (" _ ", "/_\\", "| |"),
+    "T": ("___", " | ", " | "),
+    "S": (" __", "(_ ", "__)"),
+    "E": (" __", "|_ ", "|__"),
+}
+
+
+def wordmark_lines(compact=False):
+    glyphs = COMPACT_WORDMARK_GLYPHS if compact else WORDMARK_GLYPHS
+    height = len(glyphs["D"])
+    return tuple(" ".join(glyphs[letter][row] for letter in "DATASETTE") for row in range(height))
+
+
 class SignalGarden(Static):
     """A warm, deliberately quiet animation that also works in narrow terminals."""
 

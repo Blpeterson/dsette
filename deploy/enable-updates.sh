@@ -82,17 +82,17 @@ DSETTE_SIGNATURE_FORMAT=ssh
 DSETTE_SSH_ALLOWED_SIGNERS=/etc/dsette/allowed_signers
 DSETTE_UPDATE_CA_FILE=/var/lib/dsette/tls/server.crt
 DSETTE_UPDATE_HEALTH_URL=https://$HEALTH_HOST:8223/api/v1/health
+DSETTE_UPDATE_CONTROL_DIR=/run/dsette-control
 EOF
 chown root:dsette /etc/dsette/update.env
 chmod 0640 /etc/dsette/update.env
 
-cat >/etc/sudoers.d/dsette-update <<'EOF'
-dsette ALL=(root) NOPASSWD: /bin/systemctl stop dsette
-dsette ALL=(root) NOPASSWD: /bin/systemctl start dsette
-dsette ALL=(root) NOPASSWD: /bin/systemctl restart dsette
-EOF
-chmod 0440 /etc/sudoers.d/dsette-update
-visudo -cf /etc/sudoers.d/dsette-update >/dev/null || die 'sudoers validation failed'
+install -o root -g root -m 0644 "$RELEASE/deploy/dsette-control.conf" /etc/tmpfiles.d/dsette-control.conf
+systemd-tmpfiles --create /etc/tmpfiles.d/dsette-control.conf
+for action in restart stop start; do
+  install -o root -g root -m 0644 "$RELEASE/deploy/dsette-control-$action.path" "/etc/systemd/system/dsette-control-$action.path"
+  install -o root -g root -m 0644 "$RELEASE/deploy/dsette-control-$action.service" "/etc/systemd/system/dsette-control-$action.service"
+done
 
 install -o root -g root -m 0644 "$RELEASE/deploy/updater-trigger.path" /etc/systemd/system/dsette-updater.path
 install -o root -g root -m 0644 "$RELEASE/deploy/updater-supervisor.service" /etc/systemd/system/dsette-updater.service
@@ -109,6 +109,7 @@ ln -s "$RELEASE" /var/lib/dsette/current.new
 mv -T /var/lib/dsette/current.new /var/lib/dsette/current
 trap - ERR
 systemctl daemon-reload
+systemctl enable --now dsette-control-restart.path dsette-control-stop.path dsette-control-start.path
 systemctl enable --now dsette-updater.path
 healthy=0
 systemctl restart dsette

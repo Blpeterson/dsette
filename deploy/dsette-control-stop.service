@@ -1,0 +1,15 @@
+[Unit]
+Description=Perform fixed Datasette stop
+
+[Service]
+Type=oneshot
+User=root
+Group=dsette
+ExecStart=/bin/systemctl stop dsette
+ExecStartPost=/usr/bin/rm -f /run/dsette-control/stop
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/run/dsette-control
+RestrictAddressFamilies=AF_UNIX
