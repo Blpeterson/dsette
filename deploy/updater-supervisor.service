@@ -10,6 +10,9 @@ Group=dsette
 EnvironmentFile=/etc/dsette/update.env
 Environment=DSETTE_DATA_DIR=/var/lib/dsette
 ExecStart=/opt/dsette-updater/.venv/bin/python -m dsette_server.updater run-queued
+NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
 PrivateTmp=true
 ProtectHome=true
 ProtectSystem=strict
