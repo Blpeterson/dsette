@@ -11,7 +11,7 @@ import tempfile
 import zipfile
 from pathlib import Path, PurePosixPath
 
-ROOT_FILES = {"README.md", "SECURITY.md", "pyproject.toml", "requirements.lock", "LICENSE", ".gitignore", ".gitattributes"}
+ROOT_FILES = {"README.md", "SECURITY.md", "pyproject.toml", "requirements.lock", "LICENSE", ".gitignore", ".gitattributes", "run.sh", "update.sh", "run.command", "update.command", "run.cmd", "update.cmd"}
 OPTIONAL_ROOT_FILES = {"LICENSE.md", "NOTICE"}
 DEPLOY_FILES = {
     "Caddyfile.example", "dsette.service", "firewall.md", "updater-check.sh",
@@ -52,7 +52,8 @@ def allowed(relative: PurePosixPath) -> bool:
     if relative.parts[0] == "docs": return len(relative.parts) == 2 and relative.suffix == ".md"
     # The release-construction tool and its intentionally malicious scan
     # fixtures are not runtime source and are not copied into the artifact.
-    if relative.parts[0] == "scripts": return len(relative.parts)==2 and relative.name in {"export_public.py","acceptance_large.py"}
+    if relative.parts[0] == "scripts":
+        return (len(relative.parts)==2 and relative.name in {"export_public.py","acceptance_large.py","dsette_launcher.py","bootstrap-requirements.txt"}) or (len(relative.parts)==3 and relative.parts[1]=="tests" and relative.suffix==".py")
     return False
 
 

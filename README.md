@@ -12,6 +12,20 @@ The Python package is **dsette**, the client is **dset**, and the server/admin c
 
 ## Quick start
 
+**One-command launcher:** after cloning, use `./run.sh` on Linux/WSL, double-click `run.command` on macOS, or run `run.cmd` on Windows (also from PowerShell). The launcher supports Python 3.9+ as a bootstrap and installs an isolated Python 3.12 runtime if needed; Git/OpenSSH must be installed. On Ubuntu/Debian the Python bootstrap also needs `python3-venv`. It reuses compatible existing `.venv312`/`.venv` installations. It never replaces system Python or deletes your device identity.
+
+The launcher checks for signed updates on startup (at most once per ten minutes) and applies them automatically. A new release and hash-locked dependencies are installed and smoke-tested in a separate environment **before** the checkout advances. Updates require trusted signatures and fast-forward history; local edits are preserved and cause a clear skip/refusal. If an automatic check fails or you are offline, an installed client still starts. First installation requires internet access.
+
+| OS | Launch (automatic updates) | Force an update now |
+| --- | --- | --- |
+| Linux / Ubuntu WSL | `./run.sh` | `./update.sh` |
+| macOS | `./run.command` | `./update.command` |
+| Windows cmd / PowerShell | `.\run.cmd` | `.\update.cmd` |
+
+Use `./run.sh --no-update` or `DSETTE_AUTO_UPDATE=0 ./run.sh` to skip the automatic online check (Windows: `run.cmd --no-update`). Client arguments are forwarded, for example `./run.sh --no-animation`. After the initial bootstrap you need only the launch command, not Python or virtual-environment commands. Existing enrolled devices do not enroll again. Machines on an older checkout need one `git pull --ff-only` to obtain these scripts.
+
+Update environments are cached in ignored `.dsette-runtime/` folders, retaining prior installations for recovery. The public signing-key pin and per-checkout check timestamps live in the separate OS configuration folder `dsette-launcher`; it contains no device keys or session tokens. Old cached environments are not automatically deleted while other client instances may use them.
+
 Requires Python **3.11+** on Windows, macOS, Linux, or a Python-capable phone terminal such as Termux.
 
 ```bash

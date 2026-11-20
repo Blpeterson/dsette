@@ -2,6 +2,9 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .venv/
+.venv*/
+.dsette-runtime/
+.dsette-bootstrap/
 *.egg-info/
 dist/
 build/
