@@ -5,7 +5,7 @@ LAUNCHER="$ROOT/scripts/dsette_launcher.py"
 [[ -f "$LAUNCHER" ]] || { printf 'Datasette launcher is missing: %s\n' "$LAUNCHER" >&2; exit 1; }
 
 valid_python() { "$@" -c 'import sys; raise SystemExit(sys.version_info < (3, 9))' >/dev/null 2>&1; }
-for candidate in "$ROOT/.venv312/bin/python" "$ROOT/.venv/bin/python"; do
+for candidate in "$ROOT/.venv312/bin/python" "$ROOT/.venv/bin/python" "$ROOT/.dsette-bootstrap/bin/python"; do
   if [[ -x "$candidate" ]] && valid_python "$candidate"; then exec "$candidate" "$LAUNCHER" run "$@"; fi
 done
 if command -v python3 >/dev/null 2>&1 && valid_python python3; then exec python3 "$LAUNCHER" run "$@"; fi

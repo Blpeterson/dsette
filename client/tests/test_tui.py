@@ -8,6 +8,13 @@ from dsette_client.animation import SignalGarden, WORDMARK_GLYPHS, COMPACT_WORDM
 from dsette_client.tui import BootScreen, DatasetteApp
 
 
+async def wait_for_ui_operation(app,pilot,finished):
+    async def wait():
+        while not finished(): await pilot.pause(.05)
+        await app.workers.wait_for_complete([w for w in app.workers if w.group=="operations"])
+    await asyncio.wait_for(wait(),10)
+
+
 class FakeAPI:
     config = {"device_name": "Little laptop", "url": "https://localhost:8223"}
     server_url = "https://localhost:8223"
@@ -113,8 +120,7 @@ def test_file_send_uses_actual_progress_and_shows_verification():
             app.action_panel("send")
             app.query_one("#send-path", Input).value = "letter.txt"
             app.query_one("#send-file", Button).press()
-            await asyncio.wait_for(pilot.pause(.2), 5)
-            await asyncio.wait_for(app.workers.wait_for_complete([w for w in app.workers if w.group == "operations"]), 5)
+            await wait_for_ui_operation(app,pilot,lambda:bool(api.sent) and not app.busy)
             assert api.sent == [Path("letter.txt")]
             assert app.query_one(ProgressBar).progress == 100
             assert app.query_one(SignalGarden).state == "success"
@@ -129,8 +135,7 @@ def test_error_is_readable_and_does_not_crash():
         async with app.run_test(size=(48, 20)) as pilot:
             app.action_panel("send")
             app.query_one("#send-file", Button).press()
-            await asyncio.wait_for(pilot.pause(.2), 5)
-            await asyncio.wait_for(app.workers.wait_for_complete([w for w in app.workers if w.group == "operations"]), 5)
+            await wait_for_ui_operation(app,pilot,lambda:app.query_one(SignalGarden).state=="error" and not app.busy)
             assert app.query_one(SignalGarden).state == "error"
             assert "choose a file" in str(app.query_one("#activity", Static).render())
             assert not app.busy

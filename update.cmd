@@ -14,6 +14,10 @@ if exist "%ROOT%.venv\Scripts\python.exe" (
   "%ROOT%.venv\Scripts\python.exe" -c "import sys;raise SystemExit(sys.version_info < (3,9))" >nul 2>&1
   if not errorlevel 1 goto venv
 )
+if exist "%ROOT%.dsette-bootstrap\Scripts\python.exe" (
+  "%ROOT%.dsette-bootstrap\Scripts\python.exe" -c "import sys;raise SystemExit(sys.version_info < (3,9))" >nul 2>&1
+  if not errorlevel 1 goto bootstrap
+)
 where py >nul 2>&1
 if not errorlevel 1 (
   py -3 -c "import sys;raise SystemExit(sys.version_info < (3,9))" >nul 2>&1
@@ -39,6 +43,9 @@ exit /b %errorlevel%
 exit /b %errorlevel%
 :py
 py -3 "%LAUNCHER%" update %*
+exit /b %errorlevel%
+:bootstrap
+"%ROOT%.dsette-bootstrap\Scripts\python.exe" "%LAUNCHER%" update %*
 exit /b %errorlevel%
 :python3
 python3 "%LAUNCHER%" update %*
