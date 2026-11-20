@@ -107,6 +107,10 @@ class DatasetteApp(App):
     TITLE = "Datasette · a little signal station"
     ENABLE_COMMAND_PALETTE = False
     BINDINGS = [
+        Binding("tab", "focus_next", "Next", priority=True),
+        Binding("shift+tab", "focus_previous", "Back", show=False, priority=True),
+        Binding("f5", "refresh", "Refresh", priority=True),
+        Binding("ctrl+r", "refresh", "Refresh", show=False, priority=True),
         Binding("1", "panel('push')", "Clipboard ↑", show=False),
         Binding("2", "panel('wait')", "Clipboard ↓", show=False),
         Binding("3", "panel('send')", "Send file", show=False),
@@ -117,6 +121,8 @@ class DatasetteApp(App):
         Binding("m", "motion", "Motion"),
         Binding("q", "quit", "Quit"),
     ]
+    BINDINGS += [Binding(f"alt+{index}", f"panel('{panel}')", "", show=False, priority=True)
+                 for index, panel in enumerate(("push", "wait", "send", "receive", "devices", "update"), 1)]
     CSS = """
     Screen { background: #101a1c; color: #d8dfc2; }
     #masthead { height: 3; padding: 0 2; background: #172528; color: #ecc48d; }
@@ -125,7 +131,7 @@ class DatasetteApp(App):
     #dock { width: 27; height: 1fr; padding: 1; background: #132024; grid-size: 1; grid-rows: 3; grid-gutter: 1 0; }
     #dock Button { width: 100%; min-width: 0; height: 3; background: #1d3032; color: #c6d6bc; border: none; text-align: left; padding: 0 1; }
     #dock Button:hover { background: #294143; }
-    #dock Button:focus { background: #374c43; color: #ffe0a8; text-style: bold; }
+    #dock Button:focus { color: #ffe0a8; text-style: bold underline; }
     #dock Button.selected { background: #3c4436; color: #f1cd94; }
     #room { width: 1fr; padding: 1 2; }
     .panel { height: auto; display: none; padding-bottom: 1; }
@@ -171,6 +177,9 @@ class DatasetteApp(App):
         super().__init__()
         self.api = api
         self.reduced_motion = (os.environ.get("DSETTE_REDUCED_MOTION", "").lower() in ("1", "true", "yes")) if reduced_motion is None else reduced_motion
+        self.discovering = False
+        self.inbox_generation = 0
+        self.inbox_snapshot = None
         self.current_panel = "push"
         self.incoming_clip = None
         self.inbox_items = {}
@@ -204,19 +213,21 @@ class DatasetteApp(App):
                     yield Label("Pack a little parcel", classes="section-title")
                     yield Static("Choose a file. Live mode streams while the other device receives.", classes="hint")
                     yield Input(placeholder="File path…", id="send-path")
-                    yield Checkbox("Live transfer · both devices online", id="send-live", value=True)
+                    yield Checkbox("Live relay (receiver online)", id="send-live", value=True)
                     with Horizontal(classes="action-row"):
                         yield Button("Browse…", id="browse-file")
                         yield Button("Send file  ↑", id="send-file")
                     yield Vertical(id="file-browser")
                 with Vertical(id="panel-receive", classes="panel"):
                     yield Label("The receiving shelf", classes="section-title")
-                    yield Checkbox("Show live transfers", id="receive-live", value=True)
+                    yield Checkbox("Include live senders", id="receive-live", value=True)
+                    yield Static("Live: sender waits until you choose Receive. New files appear automatically.", id="receive-help", classes="hint", markup=False)
+                    yield Static("Watching for parcels…", id="shelf-status", classes="hint", markup=False)
                     yield OptionList(id="inbox-list")
                     yield Input(placeholder="Save as… (full file path)", id="receive-path")
                     with Horizontal(classes="action-row"):
-                        yield Button("Refresh", id="refresh-inbox")
                         yield Button("Receive  ↓", id="receive-file")
+                        yield Button("Refresh · F5", id="refresh-inbox")
                 with Vertical(id="panel-devices", classes="panel"):
                     yield Label("Our little stations", classes="section-title")
                     yield Static("Choose Refresh to check your connected devices.", id="device-results", markup=False)
@@ -240,6 +251,8 @@ class DatasetteApp(App):
         self.query_one("#update-server", Button).disabled = not self.is_admin
         self.query_one("#update-client", Button).display = False
         self.query_one("#nav-push", Button).focus()
+        self.query_one("#room", VerticalScroll).can_focus = False
+        self.set_interval(2, self.refresh_inbox)
         if self.startup_animation and not self.reduced_motion:
             self.push_screen(BootScreen())
 
@@ -270,6 +283,7 @@ class DatasetteApp(App):
         self.query_one("#connection", Static).update(Text(text))
 
     def action_panel(self, panel):
+        if isinstance(self.screen,BootScreen): self.screen.finish()
         if panel not in self.LABELS:
             return
         self.stop_wait.set()
@@ -281,6 +295,76 @@ class DatasetteApp(App):
         if not self.busy:
             self.query_one(SignalGarden).state = "idle"
         self.query_one("#room", VerticalScroll).scroll_home(animate=False)
+        targets = {"push": "push-clipboard", "wait": "start-wait", "send": "send-path",
+                   "receive": "inbox-list", "devices": "refresh-devices", "update": "check-version"}
+        self.query_one("#"+targets[panel]).focus()
+        if panel == "receive": self.refresh_inbox()
+
+    def action_refresh(self):
+        if isinstance(self.screen,BootScreen): self.screen.finish(); return
+        if self.current_panel == "receive": self.refresh_inbox(manual=True)
+        elif self.current_panel == "devices": self.perform("devices")
+        elif self.current_panel == "update": self.perform("version")
+
+    def action_focus_next(self):
+        if isinstance(self.screen,BootScreen): self.screen.finish(); return
+        super().action_focus_next()
+
+    def action_focus_previous(self):
+        if isinstance(self.screen,BootScreen): self.screen.finish(); return
+        super().action_focus_previous()
+
+    def on_descendant_focus(self, event):
+        # Panel/layout changes and small screens can leave a newly focused
+        # control below the viewport until the next layout pass.
+        self.call_after_refresh(event.widget.scroll_visible, animate=False, force=True)
+
+    def on_checkbox_changed(self, event: Checkbox.Changed):
+        if event.checkbox.id == "receive-live":
+            self.inbox_generation += 1
+            self.inbox_snapshot = None
+            self.selected_transfer = None
+            self.inbox_items = {}
+            self.query_one("#inbox-list", OptionList).clear_options()
+            self.refresh_inbox()
+
+    def refresh_inbox(self, manual=False):
+        if self.current_panel != "receive" or self.busy or self.discovering:
+            return
+        self.discovering = True
+        live = self.query_one("#receive-live", Checkbox).value
+        self.query_one("#receive-help", Static).update(
+            "Live = sender waiting for Receive. Inbox = verified upload ready. Arrows choose, Enter selects, Tab reaches buttons."
+            if live else "Stored inbox only. Verified uploads appear automatically. Enable live senders to see waiting relays.")
+        if manual: self.query_one("#shelf-status", Static).update("Checking for parcels…")
+        self.discover_inbox(live, self.inbox_generation)
+
+    @work(thread=True, group="inbox-discovery", exit_on_error=False)
+    def discover_inbox(self, live, generation):
+        try:
+            items = [{**item,"_live":False} for item in self.api.inbox()]
+            if live: items = [{**item,"_live":True} for item in self.api.live_list()] + items
+            if not get_current_worker().is_cancelled:
+                self.call_from_thread(self._discovered_inbox, items, live, generation)
+        except Exception as exc:
+            if not get_current_worker().is_cancelled:
+                self.call_from_thread(self._discovery_error, exc, generation)
+        finally:
+            if not get_current_worker().is_cancelled:
+                self.call_from_thread(setattr, self, "discovering", False)
+
+    def _discovered_inbox(self, items, live, generation):
+        if generation != self.inbox_generation or self.current_panel != "receive" or self.busy:
+            return
+        identity = getattr(self.api, "device_id", None)
+        items = [item for item in items if not item.get("_live") or (not item.get("connected") and not (identity and item.get("from_device") == identity))]
+        self._show_inbox(items)
+        self.query_one("#shelf-status", Static).update(
+            f"Watching automatically · {len(items)} parcel(s) · F5 checks now")
+
+    def _discovery_error(self, exc, generation):
+        if generation == self.inbox_generation and self.current_panel == "receive" and not self.busy:
+            self.query_one("#shelf-status", Static).update(self._friendly_error(exc)+" · retrying automatically")
 
     def action_home(self):
         self.query_one("#nav-" + self.current_panel, Button).focus()
@@ -302,8 +386,11 @@ class DatasetteApp(App):
 
     def _busy(self, value):
         self.busy = value
-        for name in ("send-file", "receive-file", "push-clipboard", "update-server"):
+        for name in ("send-live", "receive-live"):
+            self.query_one("#"+name, Checkbox).disabled = value
+        for name in ("send-file", "receive-file", "push-clipboard", "update-server", "refresh-devices", "check-version"):
             self.query_one("#" + name, Button).disabled = value or (name == "update-server" and not self.is_admin)
+        self.query_one("#copy-clipboard", Button).disabled = value or self.incoming_clip is None
         cfg = getattr(self.api, "config", {}) or {}
         self.query_one("#update-client", Button).disabled = value or not bool(cfg.get("client_checkout") and cfg.get("trusted_signers"))
 
@@ -328,10 +415,13 @@ class DatasetteApp(App):
             self.perform("copy"); return
         if key == "send-file":
             self.perform("send", self.query_one("#send-path", Input).value, self.query_one("#send-live", Checkbox).value); return
+        if key == "refresh-inbox":
+            self.refresh_inbox(manual=True); return
         if key == "receive-file":
             if not self.selected_transfer:
                 self._notice("Choose a transfer from the shelf first.", "error"); return
-            self.perform("receive", self.selected_transfer, self.query_one("#receive-path", Input).value, self.query_one("#receive-live", Checkbox).value); return
+            live = self.inbox_items.get(self.selected_transfer,{}).get("_live",self.query_one("#receive-live",Checkbox).value)
+            self.perform("receive", self.selected_transfer, self.query_one("#receive-path", Input).value, live); return
         operations = {"push-clipboard": "push", "refresh-inbox": "inbox", "refresh-devices": "devices", "check-version": "version", "update-server": "update", "update-client": "client-update"}
         if key in operations:
             self.perform(operations[key])
@@ -345,18 +435,27 @@ class DatasetteApp(App):
         self.selected_transfer = event.option.id
         item = self.inbox_items.get(self.selected_transfer, {})
         name = item.get("name", "received-file")
-        self.query_one("#receive-path", Input).value = str(Path.home() / "Downloads" / name)
+        directory = Path.home()/"Downloads"
+        if not directory.is_dir(): directory = Path.home()
+        self.query_one("#receive-path", Input).value = str(directory/name)
+        self.query_one("#receive-path", Input).focus()
+        self._notice("Selected. Edit the save path, then Tab → Receive → Enter.")
 
     def _show_inbox(self, items):
-        self.selected_transfer = None
+        snapshot = tuple((str(x.get("transfer_id", x.get("id"))), x.get("name"), x.get("size"), x.get("_live")) for x in items)
+        if snapshot == self.inbox_snapshot: return
+        self.inbox_snapshot = snapshot
+        previous = self.selected_transfer
+        options = self.query_one("#inbox-list", OptionList)
+        highlighted = options.get_option_at_index(options.highlighted).id if options.highlighted is not None and options.option_count else None
         self.inbox_items = {str(x.get("transfer_id", x.get("id"))): x for x in items}
-        options = self.query_one(OptionList)
+        self.selected_transfer = previous if previous in self.inbox_items else None
         options.clear_options()
         for tid, item in self.inbox_items.items():
-            options.add_option(Option(Text(f"{item['name']}  ·  {human_size(item.get('size', 0))}"), id=tid))
+            kind = "LIVE · waiting" if item.get("_live",True) else "INBOX · ready"
+            options.add_option(Option(Text(f"{item['name']}  ·  {human_size(item.get('size', 0))} · {kind}"), id=tid))
         if self.inbox_items:
-            options.highlighted = 0
-        self._notice(f"{len(items)} parcel(s) waiting." if items else "The shelf is quiet. Send from another device, then refresh.")
+            options.highlighted = list(self.inbox_items).index(highlighted) if highlighted in self.inbox_items else 0
 
     def _incoming(self, item):
         self.incoming_clip = item
@@ -414,8 +513,9 @@ class DatasetteApp(App):
             elif operation == "send":
                 path, live = args
                 if not path.strip(): raise ValueError("choose a file first")
+                self.call_from_thread(self._notice, "Preparing parcel and calculating SHA-256…", "waiting")
                 if live:
-                    announce = lambda tid: self.call_from_thread(self._notice, "Live parcel ready. On the other device, open Receive and refresh. ID: " + tid, "waiting")
+                    announce = lambda tid: self.call_from_thread(self._notice, "Waiting for a receiver. On the other device open Receive; this file appears automatically. Select it and choose Receive. ID: " + tid, "waiting")
                     self.api.send_live(Path(path).expanduser(), progress=progress, announced=announce)
                 else:
                     self.api.send_file(Path(path).expanduser(), progress=progress)

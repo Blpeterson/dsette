@@ -26,6 +26,8 @@ class FakeAPI:
     def live_list(self):
         return [{"transfer_id": "parcel-1", "name": "letter.txt", "size": 100}]
 
+    def inbox(self): return []
+
     def devices(self):
         return [{"id": "device-1", "name": "Little laptop", "admin": True}]
 
@@ -67,9 +69,12 @@ def test_keyboard_navigation_and_responsive_layout(size):
             assert app.has_class("narrow") == (size[0] < 70)
             assert app.screen.virtual_size.width <= size[0]
             for shortcut, panel in (("3", "send"), ("4", "receive"), ("5", "devices"), ("6", "update"), ("2", "wait"), ("1", "push")):
+                await pilot.press("escape")
                 await pilot.press(shortcut)
                 assert app.current_panel == panel
                 assert app.query_one("#panel-" + panel).has_class("active")
+                assert [button.id for button in app.query("#dock Button.selected")] == ["nav-"+panel]
+                assert app.focused.id != "nav-push"
             await pilot.press("3")
             app.query_one("#send-path", Input).focus()
             await pilot.press("x", "1", "2", "3")

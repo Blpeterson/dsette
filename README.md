@@ -51,6 +51,12 @@ Run `dset` or `dset tui`. Use Tab/Shift-Tab and Enter, or these menu shortcuts:
 
 The startup animation skips on any key. Use `dset --no-animation` or `DSETTE_REDUCED_MOTION=1` for reduced motion; `NO_COLOR` disables color. Narrow layouts stack navigation and use scrollable forms. Progress reflects transferred bytes; verification is reported separately.
 
+Keyboard: Tab/Shift-Tab always move between controls, arrows navigate file lists, and Enter selects/activates. Esc returns focus to the menu; use 1–6 there, or Alt+1–6 from any field. F5 (or Ctrl+R) refreshes the receiving shelf/status. The active page and keyboard focus have different styling.
+
+The receiving shelf checks automatically every two seconds and includes live senders plus stored inbox files. You do not need to keep pressing Refresh. A **LIVE · waiting** entry begins relaying/downloading only after you select it, choose a save path, and activate Receive. An **INBOX · ready** entry has already uploaded and passed server verification. New arrivals preserve your selection and edited save path. Tab from the save path goes directly to Receive.
+
+To update an already enrolled computer, quit the app, run `git pull --ff-only` in its checkout, then reinstall with that environment's Python (`python -m pip install .`). Device identity is stored outside the checkout and survives reinstall; no new invitation is needed. If uv created an environment without pip, use `uv pip install --python PATH_TO_ENV_PYTHON .` instead.
+
 ## Transfer modes
 
 **Live:** both devices are online. A sender hashes the file, announces it, and waits for a receiver to join. Bytes flow through a bounded 2 MiB server queue with backpressure, without a server-side file copy. The receiver checks size, SHA-256, and sender completion before publishing the local file. Idle peers time out after two minutes. An interrupted live relay must restart.
