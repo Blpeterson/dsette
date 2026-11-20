@@ -24,7 +24,8 @@ def _enroll(args):
         passphrase=getpass.getpass("New local device-key passphrase: ")
         if not passphrase: raise ValueError("Passphrase cannot be empty")
         if passphrase!=getpass.getpass("Repeat passphrase: "): raise ValueError("Passphrases do not match")
-    cfg=enroll(url,invite,name,args.config_dir,args.ca_cert,fingerprint,passphrase)
+    cfg=enroll(url,invite,name,args.config_dir,args.ca_cert,fingerprint,passphrase,
+               checkout=getattr(args,"checkout",None),trusted_signers=getattr(args,"trusted_signers",None))
     print("Enrolled",cfg["device_id"],"as",cfg["device_name"])
 
 
@@ -36,6 +37,8 @@ def build_parser():
     sub=parser.add_subparsers(dest="cmd")
     command=sub.add_parser("enroll"); command.add_argument("url",nargs="?"); command.add_argument("invite",nargs="?",help="Optional; prompt keeps the token out of shell history")
     command.add_argument("--name"); command.add_argument("--ca-cert"); command.add_argument("--fingerprint"); command.add_argument("--encrypt-key",action="store_true")
+    command.add_argument("--checkout",help="Git checkout used for signed client updates (auto-detected when available)")
+    command.add_argument("--trusted-signers",help="SSH allowed-signers file (defaults to deploy/release-signers in the checkout)")
     tui=sub.add_parser("tui"); tui.add_argument("--no-animation",action="store_true",default=argparse.SUPPRESS)
     sub.add_parser("push"); sub.add_parser("pull"); sub.add_parser("inbox"); sub.add_parser("devices"); sub.add_parser("version"); sub.add_parser("live-list")
     command=sub.add_parser("wait"); command.add_argument("--after",type=int,default=0); command.add_argument("--copy",action="store_true")

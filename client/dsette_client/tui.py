@@ -102,7 +102,9 @@ class BootScreen(ModalScreen[None]):
         satellite_y = 2 + round(math.sin(angle) * 2)
         for i, char in enumerate("=[+]="):
             grid[satellite_y][satellite_x + i] = char
-        radar_text = Text("\n".join("".join(row).rstrip() for row in grid), style="#abc9a7")
+        # Equal-width lines keep the radar and satellite aligned under centered
+        # rendering; trimming individual rows makes the circle drift apart.
+        radar_text = Text("\n".join("".join(row) for row in grid), style="#abc9a7")
         self.query_one("#boot-radar", Static).update(radar_text)
 
     def on_key(self, event):

@@ -53,11 +53,35 @@ def tls_context(config):
     return context
 
 
-def enroll(url,invite,device_name,config_dir=None,ca_cert=None,fingerprint=None,passphrase=None):
+def bootstrap_update_settings(directory,checkout=None,trusted_signers=None):
+    """Pin bundled public release signers outside the mutable Git checkout."""
+    if checkout:
+        repo=Path(checkout).expanduser().resolve()
+        if not (repo/".git").exists(): raise ValueError("--checkout must point to a Git source checkout")
+    else:
+        current=Path.cwd().resolve(); module=Path(__file__).resolve()
+        candidates=list(dict.fromkeys([current,*current.parents,*module.parents]))
+        repo=next((candidate for candidate in candidates if (candidate/".git").exists() and
+                   ((candidate/"deploy"/"release-signers").is_file() or trusted_signers)),None)
+    signer_file=Path(trusted_signers).expanduser().resolve() if trusted_signers else (repo/"deploy"/"release-signers" if repo else None)
+    if signer_file is None: return {}
+    if not signer_file.is_file() or signer_file.stat().st_size>1024*1024:
+        raise ValueError("Release allowed-signers file is missing or invalid; pass --trusted-signers")
+    data=signer_file.read_bytes()
+    if not data.strip(): raise ValueError("Release allowed-signers file is empty")
+    pinned=Path(directory)/"release-signers"
+    write_private(pinned,data)
+    result={"trusted_signers":str(pinned)}
+    if repo: result["client_checkout"]=str(repo)
+    return result
+
+
+def enroll(url,invite,device_name,config_dir=None,ca_cert=None,fingerprint=None,passphrase=None,checkout=None,trusted_signers=None):
     url=validate_url(url); directory=config_directory(config_dir)
     if (directory/"config.json").exists():
         raise ValueError("This device is already enrolled; use a different --config-dir for another identity")
     cfg={"url":url,"device_name":device_name}
+    cfg.update(bootstrap_update_settings(directory,checkout,trusted_signers))
     if fingerprint:
         cfg["ca_cert"],cfg["fingerprint"]=pin_certificate(url,fingerprint,directory)
     elif ca_cert:

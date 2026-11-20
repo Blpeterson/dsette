@@ -67,7 +67,7 @@ class SignalGarden(Static):
             label += f" · {self.progress:.0%}"
         art = Text()
         if not narrow:
-            art.append("   /\\" + " " * (span + 7) + "/\\\n", style="#e1b477")
+            art.append("   /\\" + " " * (span + 2) + "/\\\n", style="#e1b477")
         art.append("  [o] ", style="#b1c99c")
         art.append("".join(line), style="#ecc48d" if self.direction == "send" else "#a7c9bf")
         art.append(" [o]\n", style="#b1c99c")

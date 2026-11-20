@@ -4,6 +4,10 @@ A little terminal signal station for sending files and clipboard notes between y
 
 Datasette uses a cozy, resizable Textual interface: amber lights, sage green signals, animated parcels between stations, and a skippable satellite/radar boot sequence. It supports desktop terminals and compact phone terminals down to **36 columns × 18 rows**.
 
+![Satellite and radar startup](docs/images/boot-preview.gif)
+
+![Send and receive animation preview using simulated progress](docs/images/transfer-preview.gif)
+
 The Python package is **dsette**, the client is **dset**, and the server/admin command is **dsetd**. This project is unrelated to Simon Willison's Datasette database application.
 
 ## Quick start

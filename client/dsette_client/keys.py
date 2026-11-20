@@ -55,7 +55,7 @@ def config_directory(path=None):
     directory.mkdir(parents=True,exist_ok=True,mode=0o700)
     if directory not in _protected_directories:
         marker=directory/".dsette-private"
-        known={"device.key","config.json","server-cert.pem","uploads.json","allowed_signers","trusted_signers"}
+        known={"device.key","config.json","server-cert.pem","uploads.json","allowed_signers","trusted_signers","release-signers"}
         if not marker.exists() and any(entry.name not in known for entry in directory.iterdir()):
             raise ValueError("Use a dedicated empty directory for --config-dir; shared directories will not be restricted")
         protect_private(directory,directory=True)

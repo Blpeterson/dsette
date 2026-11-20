@@ -2,12 +2,13 @@ import hashlib
 import json
 import os
 import stat
+from pathlib import Path
 
 import httpx
 import pytest
 
-from dsette_client.api import DsetteAPI,normalize_fingerprint,validate_url
-from dsette_client.keys import load_key,load_config,save_config
+from dsette_client.api import DsetteAPI,bootstrap_update_settings,normalize_fingerprint,validate_url
+from dsette_client.keys import config_directory,load_key,load_config,save_config
 from dsette_client import transfer
 from dsette_client.selfupdate import update_checkout,update_required
 
@@ -41,6 +42,25 @@ def test_http_urls_and_malformed_fingerprints_rejected():
         with pytest.raises(ValueError): validate_url(url)
     with pytest.raises(ValueError): normalize_fingerprint("incorrect")
     assert normalize_fingerprint(":".join(["AA"]*32))=="aa"*32
+
+
+def test_enrollment_autodetects_checkout_and_pins_release_signers(tmp_path,monkeypatch):
+    repo=tmp_path/"checkout"; (repo/".git").mkdir(parents=True); (repo/"deploy").mkdir()
+    source=repo/"deploy"/"release-signers"; source.write_text("publisher@example.invalid ssh-ed25519 test-public-key\n")
+    nested=repo/"client"; nested.mkdir(); monkeypatch.chdir(nested)
+    private=config_directory(tmp_path/"identity")
+    result=bootstrap_update_settings(private)
+    assert result["client_checkout"]==str(repo)
+    assert Path(result["trusted_signers"]).parent==private
+    original=Path(result["trusted_signers"]).read_bytes()
+    source.write_text("changed mutable checkout")
+    assert Path(result["trusted_signers"]).read_bytes()==original
+
+
+def test_enrollment_explicit_update_settings_validate_checkout(tmp_path):
+    private=config_directory(tmp_path/"identity")
+    with pytest.raises(ValueError,match="Git source checkout"):
+        bootstrap_update_settings(private,checkout=tmp_path/"missing")
 
 
 def test_session_reauth_after_401(tmp_path):

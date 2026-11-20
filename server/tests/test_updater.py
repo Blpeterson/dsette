@@ -1,4 +1,4 @@
-import json, shutil, subprocess
+import json, os, shutil, subprocess
 from pathlib import Path
 import pytest
 from dsette_server.updater import FileLock, UpdateConfig, UpdateError, Updater, _write_job, create_job, launch_update, read_job, redact, update_available
@@ -98,7 +98,7 @@ def test_real_ssh_signed_commit_is_verified(tmp_path):
     if not git or not ssh_keygen: pytest.skip("git/ssh-keygen unavailable")
     repo=tmp_path/"repo"; repo.mkdir(); key=tmp_path/"signing_key"
     def command(args,cwd=None):
-        return subprocess.run(args,cwd=cwd,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,check=True).stdout.strip()
+        return subprocess.run(args,cwd=cwd,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,check=True,timeout=30).stdout.strip()
     try:
         command([ssh_keygen,"-q","-t","ed25519","-N","","-f",str(key)])
         command([git,"init","-q"],repo)
@@ -114,6 +114,7 @@ def test_real_ssh_signed_commit_is_verified(tmp_path):
     commit=command([git,"rev-parse","HEAD"],repo)
     Updater(c)._verify_signature(commit)
 
+@pytest.mark.skipif(os.name=="nt",reason="Server updater requires Linux/systemd and POSIX atomic directory-symlink replacement")
 def test_failed_health_rolls_back_symlink_and_database(tmp_path,monkeypatch):
     c=cfg(tmp_path); c.data_dir.mkdir(); c.releases.mkdir()
     previous=tmp_path/"previous"; release=c.releases/("b"*40); previous.mkdir(); release.mkdir()
