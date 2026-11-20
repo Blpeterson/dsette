@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dsette"
+version = "0.2.0"
+description = "Secure clipboard and file transfer"
+requires-python = ">=3.11"
+dependencies = ["fastapi>=0.115,<1", "uvicorn[standard]>=0.32,<1", "cryptography>=46,<51", "httpx>=0.27,<1", "platformdirs>=4,<5", "pyperclip>=1.9,<2", "textual>=1,<9"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10"]
+
+[project.scripts]
+dsetd = "dsette_server.admin:main"
+dset = "dsette_client.main:main"
+
+[tool.setuptools]
+packages = ["dsette_server", "dsette_client"]
+package-dir = {dsette_server = "server/dsette_server", dsette_client = "client/dsette_client"}
+
+[tool.pytest.ini_options]
+testpaths = ["server/tests", "client/tests"]
+pythonpath = ["server", "client"]
+

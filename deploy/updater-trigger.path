@@ -1,0 +1,10 @@
+[Unit]
+Description=Watch for queued Datasette updates
+
+[Path]
+PathExists=/var/lib/dsette/update-trigger
+Unit=dsette-updater.service
+
+[Install]
+WantedBy=multi-user.target
+

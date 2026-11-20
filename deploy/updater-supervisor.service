@@ -1,0 +1,17 @@
+[Unit]
+Description=Datasette signed update supervisor
+After=network-online.target
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+User=dsette
+Group=dsette
+EnvironmentFile=/etc/dsette/update.env
+Environment=DSETTE_DATA_DIR=/var/lib/dsette
+ExecStart=/opt/dsette-updater/.venv/bin/python -m dsette_server.updater run-queued
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/dsette /opt/dsette-source
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6

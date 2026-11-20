@@ -1,0 +1,27 @@
+[Unit]
+Description=Datasette secure transfer service
+After=network-online.target
+
+[Service]
+User=dsette
+Group=dsette
+WorkingDirectory=/opt/dsette
+Environment=DSETTE_DATA_DIR=/var/lib/dsette
+Environment=DSETTE_ALLOWED_ROOTS=/var/lib/dsette/placed
+Environment=DSETTE_TLS_CERT=/var/lib/dsette/tls/server.crt
+Environment=DSETTE_TLS_KEY=/var/lib/dsette/tls/server.key
+ExecStart=/opt/dsette/.venv/bin/dsetd serve
+Restart=on-failure
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/dsette
+MemoryMax=256M
+TasksMax=64
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target
+
